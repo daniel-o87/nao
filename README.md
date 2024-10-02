@@ -74,4 +74,4 @@ python3 tflite_server.py
 
 
 
-You also need a directory named models where you will put the yolo_x.pn and 
+You also need a directory named models where you will put the yolo_x.pn and the tflite file
