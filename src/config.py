@@ -1,0 +1,7 @@
+#info on robot
+ROBOT_IP = "169.254.66.118"
+ROBOT_PORT = 9559
+VIDEO_RESOLUTION = 2  # 320x240
+VIDEO_COLOR_SPACE = 11  # RGB
+VIDEO_FPS = 30
+YOLO_MODEL = "../models/yolo11n.pt"
