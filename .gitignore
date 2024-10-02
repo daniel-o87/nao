@@ -1,6 +1,10 @@
 covered/
 uncovered/
-models/
+models/peekaboo_v1.h5
+models/v1.tflite
+models/v2.tflite
 nao_bot_venv/
 unnecessary_shit/
 yolo_deepsort/
+possible.txt
+todo_for_peekaboo.txt

@@ -71,3 +71,7 @@ Activate the Python 3.x environment for YOLO and TensorFlow Lite, and run the se
 source ~/yolo_py3_env/bin/activate
 python3 tflite_server.py
 ```
+
+
+
+You also need a directory named models where you will put the yolo_x.pn and 
