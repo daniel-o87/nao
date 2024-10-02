@@ -7,6 +7,7 @@ import os
 import time
 import config
 from utils import send_image_to_server, capture_frame, save_image
+import random
 
 class ConnectionError(Exception):
     pass
@@ -14,19 +15,24 @@ class ConnectionError(Exception):
 class NaoRobot:
     def __init__(self, ip, port): 
         self.session = self.connect_to_robot(ip, port)
+        self.video_client = None
+        self.retry_attempts = 10
+        self.name = ""
+
+        for i in range(3):
+            self.name += chr(random.randint(65, 90))
+        print("Name is ",self.name)
         print("CONNECTED")
+
         if self.session:
             # config for camera
             self.resolution = config.VIDEO_RESOLUTION
             self.color_space = config.VIDEO_COLOR_SPACE
             self.fps = config.VIDEO_FPS
             self.video_service = self.session.service("ALVideoDevice")
-            print('got video_service', self.video_service)
-
             self.video_service.setActiveCamera(0)
-            self.video_client = self.video_service.subscribe("python_client", self.resolution, self.color_space, self.fps)
-            print('got video client', self.video_client)
-
+            print('got video_service', self.video_service)
+            self.video_client = self.video_service.subscribe(self.name, self.resolution, self.color_space, self.fps)
             # Variable to track if the last state was covered
             self.last_state_covered = False              
 
@@ -47,43 +53,33 @@ class NaoRobot:
         else:
             raise ConnectionError("Failed to connect to the robot.")
 
+    def subscribe_to_video(self):
+        # Unsubscribe any previous client if already subscribed
+        #if self.video_client:
+        #    self.video_service.unsubscribe(self.video_client)
+        #    print("Unsubscribed from previous video client: {}".format(self.video_client))
+
+        # Subscribe to a new video client with retry logic
+        for attempt in range(self.retry_attempts):
+            self.video_client = self.video_service.subscribe("python_client", self.resolution, self.color_space, self.fps)
+            if self.video_client:
+                print('got video client: {}'.format(self.video_client))
+                break  # Successful subscription
+            else:
+                print("Failed to subscribe video client on attempt {}/{}".format(attempt + 1, self.retry_attempts))
+                time.sleep(2)  # Wait before retrying
+        print("Failed to subscribe video client after {} attempts".format(self.retry_attempts))
+
+    def unsubscribe_video(self):
+        # Unsubscribe the current video client if subscribed
+        if self.video_client:
+            self.video_service.unsubscribe(self.video_client)
+            print("Unsubscribed video client: {}".format(self.video_client))
+            self.video_client = None
 
 
     def assign_value(self, t_e):
         self.text_entry = t_e
-
-    """
-
-    def subscribe_video_service(self, retries=3):
-            # Try to subscribe to the video service, retrying if it fails. 
-            for attempt in range(retries):
-                try:
-                    self.video_client = self.video_service.subscribe("python_client", self.resolution, self.color_space, self.fps)
-                    print('got video client', self.video_client)
-                    if not self.video_client:
-                        print("Failed to subscribe to ALVideoDevice, retrying... (attempt {}/{})".format(attempt + 1, retries))
-                    else:
-                        print("Video client subscribed successfully:", self.video_client)
-                        return  # Successful subscription, return early
-                except Exception as e:
-                    print("Error during video service subscription:", e)
-                time.sleep(2)  # Add a small delay before retrying
-
-            print("Failed to subscribe to ALVideoDevice after {} attempts.".format(retries))
-            #self.video_client = self.video_service.subscribe("python_client", self.resolution, self.color_space, self.fps)
-
-    def restart_video_service(self):
-        # Unsubscribe and restart the video service. 
-        if self.video_client:
-            try:
-                self.video_service.unsubscribe(self.video_client)
-                print("Successfully unsubscribed from video client:", self.video_client)
-            except Exception as e:
-                print("Failed to unsubscribe video client:", e)
-
-        # Try to resubscribe
-        self.subscribe_video_service()
-    """ 
 
 
     def connect_to_robot(self, ip, port, max_attempts=3):
@@ -222,3 +218,5 @@ class NaoRobot:
     def shutdown(self):
         self.motion_service.stopMove()
         self.motion_service.rest()
+        self.video_service.unsubscribe(self.video_client)
+
