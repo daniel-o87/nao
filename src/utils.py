@@ -47,4 +47,3 @@ def save_image(image, directory, prefix="image"):
     num_files = len([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))])
     print("Saved: {0}, Total: {1}".format(filename, num_files))
     return filename, num_files
-
