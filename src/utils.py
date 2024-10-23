@@ -6,36 +6,57 @@ import os
 import time
 
 def capture_frame(video_service, video_client):
+    """Capture a frame from NAO's video service with error handling."""
+    try:
         image = video_service.getImageRemote(video_client)
-        if image is None:
-            print("Failed to retrieve image, restarting video client...")
-            # Restart video client if image retrieval fails
+        if image is None or len(image) < 7:  # Check for valid image data
+            print("Invalid image data received")
             return None
-
+            
         image_width = image[0]
         image_height = image[1]
-        image_array = np.frombuffer(image[6], dtype=np.uint8).reshape((image_height, image_width, 3))
-        return image_array
+        
+        # Create numpy array from image data
+        try:
+            image_array = np.frombuffer(image[6], dtype=np.uint8)
+            image_array = image_array.reshape((image_height, image_width, 3))
+            return image_array
+        except Exception as e:
+            print("Error reshaping image: {}".format(e))
+            return None
+            
+    except KeyboardInterrupt:
+        print("\nStopping video capture...")
+        raise
+    except Exception as e:
+        print("Error capturing frame: {}".format(e))
+        return None
 
-# Python2 doesnt work with tensorflow, or it does but i am too lazy to make it work. call python3 tflite_server.py prior to this and enter IP
-def send_image_to_server(image):
-    """Send captured image to the Flask server and receive a prediction."""
-    _, image_encoded = cv2.imencode('.jpg', image)
-    image_base64 = base64.b64encode(image_encoded).decode('utf-8')  # Encode as base64
-
+def send_image_to_server(image, mode):
+    """Send captured image to the flask server and receive a prediction."""
     try:
+        # Python 2.7 compatible base64 encoding
+        _, image_encoded = cv2.imencode('.jpg', image)
+        image_base64 = base64.b64encode(image_encoded.tostring())  # Use tostring() for Python 2.7
+        
+        url = "http://127.0.0.1:5000/predict/%s" % mode
+        
         response = requests.post(
-            "http://127.0.0.1:5000/predict",  
+            url,  
             json={"image": image_base64}
         )
+        
         if response.status_code == 200:
-            return response.json()['yolo_prediction']
+            return response.json()
         else:
-            prediction = response.json().get('prediction', [0])
-            return prediction[0]
-
+            print("Server error: {}".format(response.status_code))
+            return None
+            
+    except requests.exceptions.ConnectionError:
+        print("Connection failed. Is the server running?")
+        return None
     except Exception as e:
-        print("Error sending image to server:", e)
+        print("Error sending image to server: {}".format(e))
         return None
 
 def save_image(image, directory, prefix="image"):

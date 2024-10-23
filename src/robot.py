@@ -13,10 +13,11 @@ class ConnectionError(Exception):
     pass
 
 class NaoRobot:
-    def __init__(self, ip, port): 
+    def __init__(self, ip, port, mode): 
         self.session = self.connect_to_robot(ip, port)
         self.video_client = None
         self.retry_attempts = 10
+        self.mode = mode
         self.name = ""
 
         for i in range(3):
@@ -129,7 +130,7 @@ class NaoRobot:
             # Capture an image and send it for prediction when 'p' is pressed
             image = capture_frame(self.video_service, self.video_client)
             if image is not None:
-                prediction = send_image_to_server(image)
+                prediction = send_image_to_server(image, self.mode)
                 if prediction[0] < 0.5:
                     self.tts.say("Peekaboo!")
                 print(prediction)
@@ -198,23 +199,21 @@ class NaoRobot:
             new_pitch = max(min(new_pitch, 0.5149), -0.6720)
             self.motion_service.setAngles(["HeadYaw", "HeadPitch"], [new_yaw, new_pitch], 0.1)
 
-
+    """
     def update_image_prediction(self):
         # Capture an image and send it for prediction every interval
         image = capture_frame(self.video_service, self.video_client)
         if image is not None:
-            prediction = send_image_to_server(image)
+            prediction = send_image_to_server(image, self.mode)
             #print(prediction)
 
-            """
 
             if prediction[0] < 0.5:
                 self.last_state_covered = True
             elif self.last_state_covered and prediction[0] >= 0.5:
                 self.tts.say("Peekaboo!")
-                self.last_state_covered = False
-            """
-
+                    self.last_state_covered = False
+    """
     def shutdown(self):
         self.motion_service.stopMove()
         self.motion_service.rest()

@@ -1,10 +1,11 @@
+blob/
 covered/
-uncovered/
-models/peekaboo_v1.h5
-models/v1.tflite
-models/v2.tflite
 nao_bot_venv/
+nao-loop/
+uncovered/
 unnecessary_shit/
+.venv_27/
+.venv_3/
+website/
 yolo_deepsort/
-possible.txt
-todo_for_peekaboo.txt
+blob_and_crop.zip
