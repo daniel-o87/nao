@@ -6,40 +6,54 @@ import os
 import time
 
 def capture_frame(video_service, video_client):
-    """Optimized frame capture from NAO's video service."""
+    """Capture a frame from NAO's video service with error handling."""
     try:
         image = video_service.getImageRemote(video_client)
-        if image is None or len(image) < 7:
+        if image is None or len(image) < 7:  # Check for valid image data
+            print("Invalid image data received")
             return None
             
-        # Get image data directly without intermediate steps
-        return np.frombuffer(image[6], dtype=np.uint8).reshape((image[1], image[0], 3))
+        image_width = image[0]
+        image_height = image[1]
+        
+        # Create numpy array from image data
+        try:
+            image_array = np.frombuffer(image[6], dtype=np.uint8)
+            image_array = image_array.reshape((image_height, image_width, 3))
+            return image_array
+        except Exception as e:
+            print("Error reshaping image: {}".format(e))
+            return None
             
+    except KeyboardInterrupt:
+        print("\nStopping video capture...")
+        raise
     except Exception as e:
         print("Error capturing frame: {}".format(e))
         return None
 
 def send_image_to_server(image, mode):
-    """Optimized image sending to server."""
+    """Send captured image to the flask server and receive a prediction."""
     try:
-        # Resize image before sending to reduce network load
-        small_image = cv2.resize(image, (320, 240))
-        _, buffer = cv2.imencode('.jpg', small_image, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        image_base64 = base64.b64encode(buffer.tostring())
+        # Python 2.7 compatible base64 encoding
+        _, image_encoded = cv2.imencode('.jpg', image)
+        image_base64 = base64.b64encode(image_encoded.tostring())  # Use tostring() for Python 2.7
         
         url = "http://127.0.0.1:5000/predict/%s" % mode
         
         response = requests.post(
             url,  
-            json={"image": image_base64},
-            timeout=0.1  # Add timeout to prevent hanging
+            json={"image": image_base64}
         )
         
         if response.status_code == 200:
             return response.json()
-        return None
+        else:
+            print("Server error: {}".format(response.status_code))
+            return None
             
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+    except requests.exceptions.ConnectionError:
+        print("Connection failed. Is the server running?")
         return None
     except Exception as e:
         print("Error sending image to server: {}".format(e))
