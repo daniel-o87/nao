@@ -1,4 +1,5 @@
 import os
+import json
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import logging
@@ -8,6 +9,7 @@ import numpy as np
 import cv2
 import time
 from ultralytics import YOLO
+import face_recognition
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -16,7 +18,7 @@ log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
-# Load both models at startup
+# Load models at startup
 try:
     interpreter = tf.lite.Interpreter(model_path="./../models/peekaboo_model.tflite")
     interpreter.allocate_tensors()
@@ -28,8 +30,7 @@ except Exception as e:
     interpreter = None
 
 try:
-    # Use YOLOv8 model instead of YOLOv7
-    yolo_model = YOLO('yolov8n.pt')  # This will download the model if not present
+    yolo_model = YOLO('yolov8n.pt')
     print("YOLO model loaded successfully")
 except Exception as e:
     print(f"Error loading YOLO model: {str(e)}")
@@ -62,7 +63,6 @@ def predict_yolo(image):
         for result in results:
             boxes = result.boxes
             for box in boxes:
-                # Get box coordinates, confidence and class
                 x1, y1, x2, y2 = [int(x) for x in box.xyxy[0].tolist()]
                 confidence = float(box.conf[0])
                 class_id = int(box.cls[0])
@@ -79,15 +79,68 @@ def predict_yolo(image):
         print(f"Error in YOLO prediction: {str(e)}")
         return None
 
+def detect_faces(image):
+    """Run face detection and return face locations."""
+    try:
+        # Resize image for faster detection but keep it larger than before
+        small_frame = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)  # Changed from 0.25 to 0.5
+        print(f"Resized image shape: {small_frame.shape}")
+
+        # Convert BGR to RGB
+        rgb_small_frame = small_frame[:, :, ::-1]
+        
+        # Enhance image for better detection
+        # Normalize image
+        normalized = cv2.normalize(rgb_small_frame, None, 0, 255, cv2.NORM_MINMAX)
+        
+        # Enhance contrast
+        lab = cv2.cvtColor(normalized, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        cl = clahe.apply(l)
+        enhanced = cv2.merge((cl,a,b))
+        enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2RGB)
+
+        # Detect faces with more sensitive parameters
+        face_locations = face_recognition.face_locations(
+            enhanced,
+            model="hog",
+            number_of_times_to_upsample=2  # Increased from default 1
+        )
+        
+        print(f"Found {len(face_locations)} faces")
+        
+        # Scale back up face locations
+        scale = 2  # Since we used fx=0.5
+        face_locations_full = []
+        for top, right, bottom, left in face_locations:
+            face_locations_full.append([
+                int(top * scale),
+                int(right * scale),
+                int(bottom * scale),
+                int(left * scale)
+            ])
+        
+        # Save debug image
+        debug_image = image.copy()
+        for [top, right, bottom, left] in face_locations_full:
+            cv2.rectangle(debug_image, (left, top), (right, bottom), (0, 255, 0), 2)
+        cv2.imwrite('face_debug.jpg', debug_image)
+        
+        return face_locations_full
+    except Exception as e:
+        print(f"Error in face detection: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
+
 @app.route("/predict/<model_type>", methods=["POST"])
 def predict_endpoint(model_type):
-    """
-    Endpoint that takes model type as part of the URL.
-    """
+    """Endpoint that takes model type as part of the URL."""
     print(f"\nReceived prediction request for model: {model_type}")
     
-    if model_type not in ['tflite', 'yolo', 'both']:
-        return jsonify({'error': 'Invalid model type. Use tflite, yolo, or both'}), 400
+    if model_type not in ['tflite', 'yolo', 'face', 'both']:
+        return jsonify({'error': 'Invalid model type. Use tflite, yolo, face, or both'}), 400
     
     try:
         data = request.json
@@ -126,6 +179,15 @@ def predict_endpoint(model_type):
                     response['yolo_prediction'] = yolo_result
             else:
                 response['yolo_error'] = 'YOLO model not loaded'
+                
+        if model_type in ['face', 'both']:
+            print('Processing face detection...')
+            face_locations = detect_faces(image)
+            response['face_locations'] = face_locations
+                #response['face_locations'] = face_locations
+        else:
+            response['face_error'] = 'Face detection failed'
+                #response['face_locations'] = face_locations
         
         print(f"Sending response: {response}")
         return jsonify(response)
@@ -141,7 +203,8 @@ def status():
         'status': 'running',
         'available_models': {
             'tflite': interpreter is not None,
-            'yolo': yolo_model is not None
+            'yolo': yolo_model is not None,
+            'face': True
         }
     })
 
@@ -150,10 +213,12 @@ if __name__ == "__main__":
     print("\nModel Status:")
     print(f"- TFLite model: {'Loaded' if interpreter is not None else 'Not loaded'}")
     print(f"- YOLO model: {'Loaded' if yolo_model is not None else 'Not loaded'}")
+    print("- Face detection: Available")
     print("\nAvailable endpoints:")
     print("- POST /predict/tflite : Use TFLite model")
     print("- POST /predict/yolo   : Use YOLO model")
-    print("- POST /predict/both   : Use both models")
+    print("- POST /predict/face   : Use face detection")
+    print("- POST /predict/both   : Use all models")
     print("- GET  /status        : Check server status")
     
     app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)

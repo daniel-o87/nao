@@ -45,6 +45,8 @@ def send_image_to_server(image, mode):
             url,  
             json={"image": image_base64}
         )
+        if mode == 'face':
+            print(response.json())
         
         if response.status_code == 200:
             return response.json()

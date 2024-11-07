@@ -1,4 +1,5 @@
 import Tkinter as tk
+import numpy as np
 import tkMessageBox as messagebox
 import threading
 from PIL import Image, ImageTk
@@ -115,7 +116,7 @@ class NaoControlGUI:
             if prediction:
                 if self.mode == 'yolo':
                     try:
-                        image = self.annotate_image(image, prediction)
+                        image = self.annotate_image(image, prediction, self.mode)  # Pass self.mode here
                     except Exception as e:
                         print("Error annotating image: {}".format(e))
                         
@@ -129,6 +130,11 @@ class NaoControlGUI:
                             self.last_state_covered = False
                     except Exception as e:
                         print("Error processing TFLite prediction: {}".format(e))
+                elif self.mode == "face":
+                    try:
+                        image = self.annotate_image(image, prediction, self.mode)  # Pass self.mode here
+                    except Exception as e:
+                        print("Error annotating image: {}".format(e))
             
             # Convert and display image
             try:
@@ -145,15 +151,18 @@ class NaoControlGUI:
         except Exception as e:
             print("Error in video stream update: {}".format(e))
             self.root.after(100, self.update_video_stream)
-
+    """
     def annotate_image(self, image, yolo_results):
-        """Annotate the image with YOLO bounding boxes and object names."""
         try:
+            # Cell phone class ID in COCO dataset is 67
+            CELL_PHONE_CLASS = 67
+            # Minimum confidence threshold
+            CONFIDENCE_THRESHOLD = 0.4
+            
             # Check if yolo_results is a dictionary and get the predictions list
             if isinstance(yolo_results, dict) and 'yolo_prediction' in yolo_results:
                 predictions = yolo_results['yolo_prediction']
             else:
-                print("Invalid yolo_results format")
                 return image
                 
             # Iterate through the list of predictions
@@ -161,32 +170,126 @@ class NaoControlGUI:
                 try:
                     confidence = float(result['confidence'])
                     class_id = int(result['class'])
-                    bbox = result['bounding_box']
                     
+                    # Skip if not a cell phone or confidence too low
+                    if class_id != CELL_PHONE_CLASS or confidence < CONFIDENCE_THRESHOLD:
+                        continue
+                        
+                    bbox = result['bounding_box']
                     if not bbox or len(bbox) != 4:
-                        print("Invalid bounding box:", bbox)
                         continue
                     
-                    top_left = (int(bbox[0]), int(bbox[1]))
-                    bottom_right = (int(bbox[2]), int(bbox[3]))
+                    # Extract coordinates and ensure they're integers
+                    x1, y1, x2, y2 = map(int, bbox)
                     
-                    # Get the class name from the class_id
-                    class_name = class_names[class_id] if class_id < len(class_names) else "Unknown"
+                    # Color based on confidence (green gets brighter with confidence)
+                    color_intensity = int(255 * min(confidence + 0.2, 1.0))
+                    box_color = (0, color_intensity, 0)
                     
-                    # Draw bounding box
-                    cv2.rectangle(image, top_left, bottom_right, (0, 255, 0), 2)
+                    cv2.rectangle(image, (x1, y1), (x2, y2), box_color, 3)
                     
-                    # Draw label and confidence
-                    label = "{0}: {1:.2f}".format(class_name, confidence)
-                    cv2.putText(image, label, (top_left[0], top_left[1] - 10),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    label = "Phone: {}%" % confidence
+                    
+                    # Get label size for background rectangle
+                    (label_width, label_height), baseline = cv2.getTextSize(
+                        label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+                    
+                    # Draw background rectangle for label
+                    cv2.rectangle(
+                        image,
+                        (x1, y1 - label_height - 10),
+                        (x1 + label_width + 10, y1),
+                        box_color,
+                        cv2.FILLED
+                    )
+                    
+                    # Draw white text for better visibility
+                    cv2.putText(
+                        image,
+                        label,
+                        (x1 + 5, y1 - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,    # Larger font scale
+                        (255, 255, 255),  # White text
+                        2      # Thicker text
+                    )
+                    
+                    # Debug print for successful detection
+                    print("Detected phone with confidence: {}%" % confidence)
                     
                 except Exception as e:
-                    print("Error processing individual result: {}".format(e))
+                    print("Error processing individual result: {}" % e)
                     continue
                     
         except Exception as e:
-            print("Error in main annotation process: {}".format(e))
+            print("Error in main annotation process: {}" % e)
+            
+        return image
+    """
+    def annotate_image(self, image, server_results, mode):
+        """Annotate image based on detection results."""
+        try:
+            if mode == 'yolo' and 'yolo_prediction' in server_results:
+                predictions = server_results['yolo_prediction']
+                
+                for result in predictions:
+                    try:
+                        confidence = float(result['confidence'])
+                        class_id = int(result['class'])
+                        bbox = result['bounding_box']
+                        
+                        if not bbox or len(bbox) != 4:
+                            print("Invalid bounding box:", bbox)
+                            continue
+                        
+                        top_left = (int(bbox[0]), int(bbox[1]))
+                        bottom_right = (int(bbox[2]), int(bbox[3]))
+                        
+                        class_name = class_names[class_id] if class_id < len(class_names) else "Unknown"
+                        
+                        cv2.rectangle(image, top_left, bottom_right, (0, 255, 0), 2)
+                        
+                        label = "{0}: {1:.2f}".format(class_name, confidence)
+                        cv2.putText(image, label, (top_left[0], top_left[1] - 10),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        
+                    except Exception as e:
+                        print("Error processing YOLO result: {}".format(e))
+                        continue
+                        
+            elif mode == 'face':
+                if mode == 'face':
+                    print('Processing face annotation')
+                    try:
+                        face_locations = server_results['face_locations']
+                        print("Received face locations: {}".format(face_locations))
+                        
+                        if not face_locations:
+                            print("No faces detected")
+                            return image
+                            
+                        for face_loc in face_locations:
+                            try:
+                                top, right, bottom, left = face_loc
+                                
+                                cv2.rectangle(image, (left, top), (right, bottom), (0, 255, 0), 2)
+                                
+                                cv2.putText(image, "Face", (left, top - 10),
+                                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                                print("Drew face at: ({}, {}, {}, {})".format(left, top, right, bottom))
+                            except Exception as e:
+                                print("Error drawing individual face: {}".format(str(e)))
+                                continue
+                            
+                    except Exception as e:
+                        print("Error processing face results: {}".format(str(e)))
+                        import traceback
+                        traceback.print_exc()
+                              
+        except Exception as e:
+            print("Error in image annotation: {}".format(str(e)))
+            import traceback
+            traceback.print_exc()
             
         return image
 
