@@ -83,55 +83,28 @@ def detect_faces(image):
     """Run face detection and return face locations."""
     try:
         # Resize image for faster detection but keep it larger than before
-        small_frame = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)  # Changed from 0.25 to 0.5
-        print(f"Resized image shape: {small_frame.shape}")
+        small_frame = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
 
-        # Convert BGR to RGB
-        rgb_small_frame = small_frame[:, :, ::-1]
+        # Convert BGR to RGB (simplified)
+        rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
         
-        # Enhance image for better detection
-        # Normalize image
-        normalized = cv2.normalize(rgb_small_frame, None, 0, 255, cv2.NORM_MINMAX)
-        
-        # Enhance contrast
-        lab = cv2.cvtColor(normalized, cv2.COLOR_RGB2LAB)
-        l, a, b = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-        cl = clahe.apply(l)
-        enhanced = cv2.merge((cl,a,b))
-        enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2RGB)
-
-        # Detect faces with more sensitive parameters
         face_locations = face_recognition.face_locations(
-            enhanced,
-            model="hog",
-            number_of_times_to_upsample=2  # Increased from default 1
+            rgb_small_frame,
+            model="hog",  
+            number_of_times_to_upsample=1  # Reduced for speed
         )
-        
-        print(f"Found {len(face_locations)} faces")
         
         # Scale back up face locations
         scale = 2  # Since we used fx=0.5
-        face_locations_full = []
-        for top, right, bottom, left in face_locations:
-            face_locations_full.append([
-                int(top * scale),
-                int(right * scale),
-                int(bottom * scale),
-                int(left * scale)
-            ])
-        
-        # Save debug image
-        debug_image = image.copy()
-        for [top, right, bottom, left] in face_locations_full:
-            cv2.rectangle(debug_image, (left, top), (right, bottom), (0, 255, 0), 2)
-        cv2.imwrite('face_debug.jpg', debug_image)
+        face_locations_full = [
+            [int(top * scale), int(right * scale), 
+             int(bottom * scale), int(left * scale)]
+            for top, right, bottom, left in face_locations
+        ]
         
         return face_locations_full
     except Exception as e:
         print(f"Error in face detection: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return []
 
 @app.route("/predict/<model_type>", methods=["POST"])

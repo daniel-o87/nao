@@ -110,13 +110,15 @@ class NaoControlGUI:
                 self.root.after(100, self.update_video_stream)
                 return
                 
+
+            image_rgb = cv2.cvtColor(image.copy(), cv2.COLOR_BGR2RGB)
             # Get prediction if image capture was successful
             prediction = send_image_to_server(image, self.mode)
             
             if prediction:
                 if self.mode == 'yolo':
                     try:
-                        image = self.annotate_image(image, prediction, self.mode)  # Pass self.mode here
+                        image = self.annotate_image(image_rgb, prediction, self.mode)  # Pass self.mode here
                     except Exception as e:
                         print("Error annotating image: {}".format(e))
                         
@@ -132,13 +134,13 @@ class NaoControlGUI:
                         print("Error processing TFLite prediction: {}".format(e))
                 elif self.mode == "face":
                     try:
-                        image = self.annotate_image(image, prediction, self.mode)  # Pass self.mode here
+                        image = self.annotate_image(image_rgb, prediction, self.mode)  # Pass self.mode here
                     except Exception as e:
                         print("Error annotating image: {}".format(e))
             
             # Convert and display image
             try:
-                img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                img = Image.fromarray(image)
                 imgtk = ImageTk.PhotoImage(image=img)
                 self.video_label.imgtk = imgtk
                 self.video_label.configure(image=imgtk)
@@ -146,7 +148,7 @@ class NaoControlGUI:
                 print("Error updating display: {}".format(e))
                 
             # Schedule next update
-            self.root.after(10, self.update_video_stream)
+            self.root.after(50, self.update_video_stream)
             
         except Exception as e:
             print("Error in video stream update: {}".format(e))
@@ -259,10 +261,10 @@ class NaoControlGUI:
                         
             elif mode == 'face':
                 if mode == 'face':
-                    print('Processing face annotation')
+                    #print('Processing face annotation')
                     try:
                         face_locations = server_results['face_locations']
-                        print("Received face locations: {}".format(face_locations))
+                        #print("Received face locations: {}".format(face_locations))
                         
                         if not face_locations:
                             print("No faces detected")
@@ -276,7 +278,7 @@ class NaoControlGUI:
                                 
                                 cv2.putText(image, "Face", (left, top - 10),
                                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                                print("Drew face at: ({}, {}, {}, {})".format(left, top, right, bottom))
+                                #print("Drew face at: ({}, {}, {}, {})".format(left, top, right, bottom))
                             except Exception as e:
                                 print("Error drawing individual face: {}".format(str(e)))
                                 continue
