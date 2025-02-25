@@ -62,6 +62,13 @@ class NaoEnvironment:
         tts.say(message)
 
 
+    def motion_endpoint(self, x, y, theta):
+        if self.session is None:
+            raise ConnectionError("Not connected to robot")
+
+        motion = self.services.get("motion")
+        motion.moveToward(x, y, theta)
+
     def posture_endpoint(self, name, speed):
         ### http://doc.aldebaran.com/2-1/naoqi/motion/alrobotposture-api.html#ALRobotPostureProxy::getPostureList
         ### Change Posture of NAO
