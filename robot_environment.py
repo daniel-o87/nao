@@ -67,7 +67,19 @@ class NaoEnvironment:
             raise ConnectionError("Not connected to robot")
 
         motion = self.services.get("motion")
-        motion.moveToward(x, y, theta)
+        if x != 0.0 or y != 0.0 or theta != 0.0:
+            self.motion_service.moveToward(x, y, theta)
+        else:
+            self.motion_service.stopMove()
+    
+    def head_endpoint(self, head_yaw_speed, head_pitch_speed):
+        if head_yaw_speed != 0.0 or head_pitch_speed != 0.0:
+            current_yaw, current_pitch = self.motion_service.getAngles(["HeadYaw", "HeadPitch"], True)
+            new_yaw = current_yaw + head_yaw_speed
+            new_pitch = current_pitch + head_pitch_speed
+            new_yaw = max(min(new_yaw, 2.0857), -2.0857)
+            new_pitch = max(min(new_pitch, 0.5149), -0.6720)
+            self.motion_service.setAngles(["HeadYaw", "HeadPitch"], [new_yaw, new_pitch], 0.1)
 
     def posture_endpoint(self, name, speed):
         ### http://doc.aldebaran.com/2-1/naoqi/motion/alrobotposture-api.html#ALRobotPostureProxy::getPostureList

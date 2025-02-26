@@ -3,7 +3,7 @@ import qi
 import config
 from robot_agent import NaoActions
 from robot_environment import NaoEnvironment
-import robot_gui
+from robot_gui import NaoControlGUI
 
 
 if __name__ == "__main__":
@@ -16,4 +16,5 @@ if __name__ == "__main__":
     nao_actions = NaoActions(nao_brain)
     nao_actions.speak("Hello Friends")
     nao_actions.change_posture("StandInit", 0.5)
+    NaoControlGUI(nao_actions)
 

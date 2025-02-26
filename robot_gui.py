@@ -15,15 +15,13 @@ class NaoControlGUI:
         
         # Movement buttons
         ttk.Button(control_frame, text="Forward", 
-                  command=lambda: self.agent.process_command("forward")).grid(row=0, column=1)
+                  command=lambda: self.agent.walk(0.5, 0, 0).grid(row=0, column=1)
         ttk.Button(control_frame, text="Left", 
-                  command=lambda: self.agent.process_command("left")).grid(row=1, column=0)
-        ttk.Button(control_frame, text="Stop", 
-                  command=lambda: self.agent.process_command("stop")).grid(row=1, column=1)
+                  command=lambda: self.agent.walk(-0.5, 0, 0).grid(row=1, column=0)
         ttk.Button(control_frame, text="Right", 
-                  command=lambda: self.agent.process_command("right")).grid(row=1, column=2)
+                  command=lambda: self.agent.walk(0, 0.5, 0).grid(row=1, column=2)
         ttk.Button(control_frame, text="Backward", 
-                  command=lambda: self.agent.process_command("backward")).grid(row=2, column=1)
+                  command=lambda: self.agent.walk(0, -0.5, 0).grid(row=2, column=1)
         
         # Status display
         self.status_var = tk.StringVar(value="Status: Ready")
