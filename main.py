@@ -14,7 +14,7 @@ if __name__ == "__main__":
         print(exit)
 
     nao_actions = NaoActions(nao_brain)
+    nao_gui = NaoControlGUI(nao_actions)
     nao_actions.speak("Hello Friends")
     nao_actions.change_posture("StandInit", 0.5)
-    NaoControlGUI(nao_actions)
-
+    nao_gui.run()
